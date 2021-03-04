@@ -1,0 +1,77 @@
+services:
+
+  db:
+    image: mariadb
+    restart: always
+    volumes:
+      - db_data:/var/lib/mysql
+    env_file:
+      - ./db/main.env
+      - ./db/priv.env
+
+  app:
+    image: nextcloud:fpm-alpine
+    restart: always
+    volumes:
+      - app_data:/var/www/html
+    environment:
+      - MYSQL_HOST=db
+      - OVERWRITEPROTOCOL=https
+    env_file:
+      - ./db/main.env
+    depends_on:
+      - db
+
+  web:
+    image: nginx:alpine
+    restart: always
+    volumes:
+      - ./web/nginx.conf:/etc/nginx/nginx.conf
+      - app_data:/var/www/html:ro
+    env_file:
+      - ./web/main.env
+    depends_on:
+      - app
+    networks:
+      - default
+      - proxy-tier
+
+  proxy:
+    image: jwilder/nginx-proxy:alpine
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+    volumes:
+      - ./proxy/uploadsize.conf:/etc/nginx/conf.d/uploadsize.conf
+      - certs:/etc/nginx/certs:ro
+      - vhost.d:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - proxy-tier
+
+  cert-manager:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: always
+    volumes:
+      - certs:/etc/nginx/certs
+      - vhost.d:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy-tier
+    depends_on:
+      - proxy
+
+volumes:
+  db_data:
+  app_data:
+  certs:
+  vhost.d:
+  html:
+
+networks:
+  proxy-tier:
