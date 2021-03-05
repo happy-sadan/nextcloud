@@ -66,6 +66,12 @@ services:
     depends_on:
       - proxy
 
+  ddns:
+    image: linuxserver/ddclient
+    restart: always
+    volumes:
+      - ./ddns/ddclient.conf:/config/ddclient.conf
+
 volumes:
   db_data:
   app_data:
